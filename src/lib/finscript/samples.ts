@@ -45,7 +45,7 @@ PLAZO: 24 MESES
   {
     id: "error-sintactico",
     title: "Error sintáctico",
-    description: "Falta el separador ":"",
+    description: "Falta el separador de dos puntos",
     code: `MONEDA USD
 CAPITAL: 8000
 TASA_ANUL: 9%
