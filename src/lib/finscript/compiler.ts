@@ -44,7 +44,7 @@ function lex(source: string): { tokens: Token[]; errors: CompileError[] } {
 
   source.split("\n").forEach((rawLine, i) => {
     const line = i + 1;
-    const withoutComment = rawLine.split("//")[0];
+    const withoutComment = rawLine.split("//")[0] ?? "";
     if (!withoutComment.trim()) return;
 
     const re = /[A-Za-z_][A-Za-z_0-9]*|\d+(?:\.\d+)?%?|:|;|\S/g;
@@ -84,7 +84,7 @@ function parse(source: string): { statements: Statement[]; errors: CompileError[
 
   source.split("\n").forEach((rawLine, i) => {
     const line = i + 1;
-    const text = rawLine.split("//")[0];
+    const text = rawLine.split("//")[0] ?? "";
     if (!text.trim()) return;
 
     const clean = text.trim().replace(/;$/, "");
@@ -175,7 +175,7 @@ function analyze(statements: Statement[]): {
           });
           break;
         }
-        values.MONEDA = v;
+        values["MONEDA"] = v;
         symbols.push({
           name: "MONEDA",
           type: "MONEDA",
@@ -206,7 +206,7 @@ function analyze(statements: Statement[]): {
           });
           break;
         }
-        values.CAPITAL = n;
+        values["CAPITAL"] = n;
         symbols.push({
           name: "CAPITAL",
           type: "DECIMAL",
@@ -245,7 +245,7 @@ function analyze(statements: Statement[]): {
             kind: "semantico",
           });
         }
-        values.TASA_ANUAL = n;
+        values["TASA_ANUAL"] = n;
         symbols.push({
           name: "TASA_ANUAL",
           type: "PORCENTAJE",
@@ -287,7 +287,7 @@ function analyze(statements: Statement[]): {
             kind: "semantico",
           });
         }
-        values.PLAZO = n;
+        values["PLAZO"] = n;
         symbols.push({
           name: "PLAZO",
           type: "ENTERO",
@@ -309,7 +309,7 @@ function analyze(statements: Statement[]): {
           });
           break;
         }
-        values.METODO = v;
+        values["METODO"] = v;
         symbols.push({
           name: "METODO",
           type: "ENUM",
@@ -331,7 +331,7 @@ function analyze(statements: Statement[]): {
           });
           break;
         }
-        values.COMISION = n;
+        values["COMISION"] = n;
         symbols.push({
           name: "COMISION",
           type: "PORCENTAJE",
@@ -407,10 +407,10 @@ function generate(values: Record<string, string | number>): {
   cuota: number;
   totalIntereses: number;
 } {
-  const capital = Number(values.CAPITAL);
-  const tasaAnual = Number(values.TASA_ANUAL);
-  const plazo = Number(values.PLAZO);
-  const metodo = String(values.METODO ?? "FRANCES");
+  const capital = Number(values["CAPITAL"]);
+  const tasaAnual = Number(values["TASA_ANUAL"]);
+  const plazo = Number(values["PLAZO"]);
+  const metodo = String(values["METODO"] ?? "FRANCES");
   const i = tasaAnual / 100 / 12;
 
   const rows: AmortizationRow[] = [];
@@ -525,15 +525,15 @@ export function compileLocally(source: string): CompileResult {
     ast,
     amortization,
     summary: {
-      moneda: String(values.MONEDA),
-      capital: Number(values.CAPITAL),
-      tasaAnual: Number(values.TASA_ANUAL),
-      tasaMensual: Math.round((Number(values.TASA_ANUAL) / 12) * 10000) / 10000,
-      plazo: Number(values.PLAZO),
-      metodo: String(values.METODO ?? "FRANCES"),
+      moneda: String(values["MONEDA"]),
+      capital: Number(values["CAPITAL"]),
+      tasaAnual: Number(values["TASA_ANUAL"]),
+      tasaMensual: Math.round((Number(values["TASA_ANUAL"]) / 12) * 10000) / 10000,
+      plazo: Number(values["PLAZO"]),
+      metodo: String(values["METODO"] ?? "FRANCES"),
       cuota,
       totalIntereses,
-      totalPagado: round(Number(values.CAPITAL) + totalIntereses),
+      totalPagado: round(Number(values["CAPITAL"]) + totalIntereses),
       tiempoMs,
     },
     engine: "local",
