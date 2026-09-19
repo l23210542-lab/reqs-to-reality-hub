@@ -51,7 +51,7 @@ export async function compileSource(sourceCode: string): Promise<CompileResult> 
 
     return {
       ok: res.ok && errors.length === 0,
-      errors: errors.map((e) => ({ kind: "sintactico", ...e })),
+      errors: errors.map((e) => ({ kind: e.kind ?? "sintactico", ...e })),
       warnings: data.warnings ?? [],
       tokens: data.tokens ?? [],
       symbols: data.symbols ?? data.symbol_table ?? [],
