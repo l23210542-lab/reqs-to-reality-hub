@@ -57,9 +57,8 @@ export const Route = createFileRoute("/")({
     ],
   }),
   component: Playground,
-  validateSearch: (search: Record<string, unknown>) => ({
-    contrato: typeof search.contrato === "string" ? search.contrato : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { contrato?: string } =>
+    typeof search["contrato"] === "string" ? { contrato: search["contrato"] } : {},
 });
 
 function Playground() {
@@ -204,7 +203,7 @@ function Playground() {
           </Dialog>
         </header>
 
-        <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">
+        <ResizablePanelGroup className="min-h-0 flex-1">
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
