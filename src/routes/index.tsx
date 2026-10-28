@@ -20,16 +20,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useSession } from "@/hooks/use-session";
 import { compileSource } from "@/lib/finscript/api";
 import { DEFAULT_SOURCE, SAMPLES } from "@/lib/finscript/samples";
 import type { CompileResult } from "@/lib/finscript/types";
 import {
+  getContract,
   insertContract,
   listContracts,
   updateContract,
@@ -74,24 +71,37 @@ function Playground() {
   const [contractId, setContractId] = useState<string | null>(null);
   const [saved, setSaved] = useState<Contract[]>([]);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (ready && !session) navigate({ to: "/auth" });
   }, [ready, session, navigate]);
 
+  const refreshSaved = async () => {
+    try {
+      setSaved(await listContracts());
+    } catch (err) {
+      toast.error(`No se pudieron cargar los contratos: ${(err as Error).message}`);
+    }
+  };
+
   useEffect(() => {
-    if (!session) return;
-    setSaved(listContracts(session.id));
-  }, [session, saveOpen]);
+    if (session) void refreshSaved();
+  }, [session]);
 
   useEffect(() => {
     if (!contrato || !session) return;
-    const row = listContracts(session.id).find((c) => c.id === contrato);
-    if (row) {
-      setContractId(row.id);
-      setTitulo(row.titulo);
-      setSourceCode(row.codigo_fuente);
-    }
+    getContract(contrato)
+      .then((row) => {
+        if (!row) {
+          toast.error("El contrato no existe o no tienes acceso.");
+          return;
+        }
+        setContractId(row.id);
+        setTitulo(row.titulo);
+        setSourceCode(row.codigo_fuente);
+      })
+      .catch((err: Error) => toast.error(`No se pudo abrir el contrato: ${err.message}`));
   }, [contrato, session]);
 
   const handleCompile = async () => {
@@ -107,17 +117,29 @@ function Playground() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!session) return;
-    if (contractId) {
-      updateContract(contractId, { titulo, codigo_fuente: sourceCode });
-      toast.success("Contrato actualizado");
-    } else {
-      const row = insertContract(session.id, titulo, sourceCode);
-      setContractId(row.id);
-      toast.success("Contrato guardado");
+    if (!titulo.trim()) {
+      toast.error("El título no puede estar vacío.");
+      return;
     }
-    setSaveOpen(false);
+    setIsSaving(true);
+    try {
+      if (contractId) {
+        await updateContract(contractId, { titulo, codigo_fuente: sourceCode });
+        toast.success("Contrato actualizado");
+      } else {
+        const row = await insertContract(titulo, sourceCode);
+        setContractId(row.id);
+        toast.success("Contrato guardado");
+      }
+      setSaveOpen(false);
+      await refreshSaved();
+    } catch (err) {
+      toast.error(`No se pudo guardar: ${(err as Error).message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const loadContract = (row: Contract) => {
@@ -195,7 +217,7 @@ function Playground() {
               <div className="space-y-3">
                 <Label htmlFor="titulo">Título</Label>
                 <Input id="titulo" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-                <Button onClick={handleSave} className="w-full">
+                <Button onClick={() => void handleSave()} disabled={isSaving} className="w-full">
                   {contractId ? "Actualizar contrato" : "Guardar contrato"}
                 </Button>
               </div>
@@ -207,9 +229,7 @@ function Playground() {
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-                <span className="font-mono text-xs text-muted-foreground">
-                  contrato.finscript
-                </span>
+                <span className="font-mono text-xs text-muted-foreground">contrato.finscript</span>
                 <Button size="sm" onClick={handleCompile} disabled={isCompiling} className="gap-2">
                   {isCompiling ? (
                     <Loader2 className="size-4 animate-spin" />

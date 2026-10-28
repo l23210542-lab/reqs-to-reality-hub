@@ -1,17 +1,8 @@
 import { compileLocally } from "./compiler";
 import type { CompileError, CompileResult } from "./types";
 
-const BACKEND_KEY = "finscript.backendUrl";
-
 export function getBackendUrl(): string {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(BACKEND_KEY) ?? "";
-}
-
-export function setBackendUrl(url: string) {
-  if (typeof window === "undefined") return;
-  if (url.trim()) window.localStorage.setItem(BACKEND_KEY, url.trim());
-  else window.localStorage.removeItem(BACKEND_KEY);
+  return (import.meta.env.VITE_API_URL ?? "").trim().replace(/\/$/, "");
 }
 
 interface BackendPayload {
@@ -29,8 +20,8 @@ interface BackendPayload {
 }
 
 /**
- * POST /api/compile hacia el backend FastAPI cuando hay una URL configurada.
- * Si no hay backend o la red falla, se usa el compilador local equivalente.
+ * POST {VITE_API_URL}/compile hacia el backend FastAPI.
+ * Sin VITE_API_URL se usa el compilador local equivalente.
  */
 export async function compileSource(sourceCode: string): Promise<CompileResult> {
   const base = getBackendUrl();
@@ -38,7 +29,7 @@ export async function compileSource(sourceCode: string): Promise<CompileResult> 
 
   const started = performance.now();
   try {
-    const res = await fetch(`${base.replace(/\/$/, "")}/compile`, {
+    const res = await fetch(`${base}/compile`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source_code: sourceCode }),
@@ -66,13 +57,19 @@ export async function compileSource(sourceCode: string): Promise<CompileResult> 
       ],
     };
   } catch (err) {
-    const local = compileLocally(sourceCode);
+    const message = `No se pudo contactar el backend en ${base}: ${(err as Error).message}`;
     return {
-      ...local,
-      logs: [
-        `[http] No se pudo contactar el backend (${(err as Error).message}). Se usó el compilador local.`,
-        ...local.logs,
-      ],
+      ok: false,
+      errors: [{ line: 1, column: 1, message, kind: "sintactico" }],
+      warnings: [],
+      tokens: [],
+      symbols: [],
+      addresses: [],
+      ast: null,
+      amortization: [],
+      summary: null,
+      engine: "backend",
+      logs: [`[http] ${message}`],
     };
   }
 }

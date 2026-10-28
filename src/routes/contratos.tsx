@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FileCode2, Trash2, PenLine } from "lucide-react";
+import { FileCode2, Loader2, Trash2, PenLine } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
@@ -32,14 +32,35 @@ function ContractsPage() {
   const navigate = useNavigate();
   const { session, ready } = useSession();
   const [rows, setRows] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (ready && !session) navigate({ to: "/auth" });
   }, [ready, session, navigate]);
 
+  const refresh = async () => {
+    try {
+      setRows(await listContracts());
+    } catch (err) {
+      toast.error(`No se pudieron cargar los contratos: ${(err as Error).message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (session) setRows(listContracts(session.id));
+    if (session) void refresh();
   }, [session]);
+
+  const remove = async (id: string) => {
+    try {
+      await deleteContract(id);
+      toast.success("Contrato eliminado");
+      await refresh();
+    } catch (err) {
+      toast.error(`No se pudo eliminar: ${(err as Error).message}`);
+    }
+  };
 
   return (
     <AppShell>
@@ -52,7 +73,11 @@ function ContractsPage() {
           </p>
         </header>
 
-        {rows.length === 0 ? (
+        {loading ? (
+          <div className="panel flex items-center justify-center gap-2 p-10 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Cargando contratos…
+          </div>
+        ) : rows.length === 0 ? (
           <div className="panel flex flex-col items-center gap-3 p-10 text-center">
             <FileCode2 className="size-7 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
@@ -85,11 +110,7 @@ function ContractsPage() {
                       size="sm"
                       variant="ghost"
                       className="gap-2 text-destructive"
-                      onClick={() => {
-                        deleteContract(row.id);
-                        setRows(session ? listContracts(session.id) : []);
-                        toast.success("Contrato eliminado");
-                      }}
+                      onClick={() => void remove(row.id)}
                     >
                       <Trash2 className="size-4" />
                     </Button>

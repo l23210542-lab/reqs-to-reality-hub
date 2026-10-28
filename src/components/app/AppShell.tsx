@@ -1,12 +1,8 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { FileCode2, FilePlus2, LogOut, Terminal, Settings2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { FileCode2, FilePlus2, LogOut, Terminal } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { signOut } from "@/lib/auth";
-import { getBackendUrl, setBackendUrl } from "@/lib/finscript/api";
 import { useSession } from "@/hooks/use-session";
 import { toast } from "sonner";
 
@@ -14,56 +10,6 @@ const nav = [
   { to: "/", label: "Nuevo contrato", icon: FilePlus2 },
   { to: "/contratos", label: "Mis contratos", icon: FileCode2 },
 ];
-
-function BackendDialog() {
-  const [url, setUrl] = useState("");
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (v) setUrl(getBackendUrl());
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground">
-          <Settings2 className="size-4" /> Backend del compilador
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Backend del compilador</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Label htmlFor="backend">URL base de la API (FastAPI)</Label>
-          <Input
-            id="backend"
-            placeholder="http://localhost:8000/api"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground">
-            Se enviará <span className="font-mono">POST {"{URL}"}/compile</span> con{" "}
-            <span className="font-mono">{'{ "source_code": "..." }'}</span>. Si se deja vacío, o el
-            servidor no responde, se usa el compilador local incluido en esta app.
-          </p>
-          <Button
-            onClick={() => {
-              setBackendUrl(url);
-              setOpen(false);
-              toast.success(url.trim() ? "Backend configurado" : "Usando compilador local");
-            }}
-          >
-            Guardar
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -78,7 +24,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Terminal className="size-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold tracking-tight text-sidebar-foreground">FinScript</p>
+            <p className="text-sm font-semibold tracking-tight text-sidebar-foreground">
+              FinScript
+            </p>
             <p className="text-xs text-muted-foreground">Compiler Web</p>
           </div>
         </div>
@@ -104,7 +52,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-2 border-t border-sidebar-border pt-4">
-          <BackendDialog />
           {session ? (
             <>
               <p className="truncate px-3 text-xs text-muted-foreground">{session.email}</p>
@@ -112,9 +59,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 variant="ghost"
                 size="sm"
                 className="w-full justify-start gap-2 text-muted-foreground"
-                onClick={() => {
-                  signOut();
-                  navigate({ to: "/auth" });
+                onClick={async () => {
+                  try {
+                    await signOut();
+                    navigate({ to: "/auth" });
+                  } catch (err) {
+                    toast.error((err as Error).message);
+                  }
                 }}
               >
                 <LogOut className="size-4" /> Cerrar sesión

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { signIn } from "@/lib/auth";
+import { signIn, signUp } from "@/lib/auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -34,16 +34,35 @@ function AuthPage() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@") || password.length < 6) {
       toast.error("Ingresa un correo válido y una contraseña de 6 caracteres o más.");
       return;
     }
-    signIn(email);
-    toast.success(mode === "login" ? "Sesión iniciada" : "Cuenta creada");
-    navigate({ to: "/" });
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        await signIn(email, password);
+        toast.success("Sesión iniciada");
+        navigate({ to: "/" });
+        return;
+      }
+      const session = await signUp(email, password);
+      if (session) {
+        toast.success("Cuenta creada");
+        navigate({ to: "/" });
+      } else {
+        toast.success("Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.");
+        setMode("login");
+      }
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -91,15 +110,10 @@ function AuthPage() {
               placeholder="••••••••"
             />
           </div>
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full" disabled={loading}>
             {mode === "login" ? "Entrar al playground" : "Crear cuenta"}
           </Button>
         </form>
-
-        <p className="mt-4 text-xs text-muted-foreground">
-          Sesión de prototipo: se guarda en este navegador. Al conectar la base de datos se
-          reemplaza por autenticación real sin cambiar esta pantalla.
-        </p>
       </div>
     </div>
   );

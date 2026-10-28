@@ -1,8 +1,4 @@
-/**
- * CRUD de contratos (tabla `contratos`: id, user_id, titulo, codigo_fuente, created_at).
- * Implementado sobre almacenamiento local del navegador; al conectar la base de
- * datos, estas funciones se reemplazan por llamadas equivalentes al backend.
- */
+import { supabase } from "./supabase";
 
 export interface Contract {
   id: string;
@@ -13,63 +9,43 @@ export interface Contract {
   updated_at: string;
 }
 
-const KEY = "finscript.contratos";
+const TABLE = "contratos";
 
-function readAll(): Contract[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as Contract[];
-  } catch {
-    return [];
-  }
+export async function listContracts(): Promise<Contract[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data as Contract[];
 }
 
-function writeAll(rows: Contract[]) {
-  window.localStorage.setItem(KEY, JSON.stringify(rows));
+export async function getContract(id: string): Promise<Contract | null> {
+  const { data, error } = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as Contract | null;
 }
 
-export function listContracts(userId: string): Contract[] {
-  return readAll()
-    .filter((c) => c.user_id === userId)
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+export async function insertContract(titulo: string, codigoFuente: string): Promise<Contract> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ titulo, codigo_fuente: codigoFuente })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Contract;
 }
 
-export function getContract(id: string): Contract | undefined {
-  return readAll().find((c) => c.id === id);
-}
-
-export function insertContract(
-  userId: string,
-  titulo: string,
-  codigoFuente: string,
-): Contract {
-  const now = new Date().toISOString();
-  const row: Contract = {
-    id: crypto.randomUUID(),
-    user_id: userId,
-    titulo,
-    codigo_fuente: codigoFuente,
-    created_at: now,
-    updated_at: now,
-  };
-  writeAll([...readAll(), row]);
-  return row;
-}
-
-export function updateContract(
+export async function updateContract(
   id: string,
   patch: Partial<Pick<Contract, "titulo" | "codigo_fuente">>,
-): Contract | undefined {
-  const rows = readAll();
-  const idx = rows.findIndex((c) => c.id === id);
-  if (idx === -1) return undefined;
-  const current = rows[idx]!;
-  const next: Contract = { ...current, ...patch, updated_at: new Date().toISOString() };
-  rows[idx] = next;
-  writeAll(rows);
-  return next;
+): Promise<Contract> {
+  const { data, error } = await supabase.from(TABLE).update(patch).eq("id", id).select().single();
+  if (error) throw error;
+  return data as Contract;
 }
 
-export function deleteContract(id: string) {
-  writeAll(readAll().filter((c) => c.id !== id));
+export async function deleteContract(id: string) {
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
 }

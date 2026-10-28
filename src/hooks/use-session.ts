@@ -1,19 +1,25 @@
 import { useEffect, useState } from "react";
-import { getSession, type Session } from "@/lib/auth";
+import { getSession, toSession, type Session } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export function useSession() {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const sync = () => setSession(getSession());
-    sync();
-    setReady(true);
-    window.addEventListener("finscript-auth", sync);
-    window.addEventListener("storage", sync);
+    let active = true;
+    getSession().then((s) => {
+      if (!active) return;
+      setSession(s);
+      setReady(true);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(toSession(s?.user));
+      setReady(true);
+    });
     return () => {
-      window.removeEventListener("finscript-auth", sync);
-      window.removeEventListener("storage", sync);
+      active = false;
+      data.subscription.unsubscribe();
     };
   }, []);
 
