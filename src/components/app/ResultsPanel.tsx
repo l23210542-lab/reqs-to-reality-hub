@@ -4,8 +4,11 @@ import {
   CircleSlash,
   Cpu,
   Hash,
+  Landmark,
   Percent,
+  TrendingDown,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Area,
@@ -27,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AstNode, CompileResult } from "@/lib/finscript/types";
+import type { AstNode, CompileResult, CompileSummary } from "@/lib/finscript/types";
 
 const money = (n: number, moneda: string) =>
   `${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${moneda}`;
@@ -50,6 +53,52 @@ function AstTree({ node, depth = 0 }: { node: AstNode; depth?: number }) {
       ))}
     </div>
   );
+}
+
+interface Kpi {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  hint?: string;
+  highlight?: boolean;
+}
+
+function buildKpis(summary: CompileSummary): Kpi[] {
+  const { moneda } = summary;
+  const kpis: Kpi[] = [
+    {
+      icon: Wallet,
+      label: "Cuota mensual",
+      value: money(summary.cuota, moneda),
+      ...((summary.graciaMeses ?? 0) > 0 && {
+        hint: `Tras ${summary.graciaMeses} mes(es) de gracia`,
+      }),
+    },
+    { icon: Percent, label: "Tasa mensual", value: `${summary.tasaMensual}%` },
+    { icon: Hash, label: "Total intereses", value: money(summary.totalIntereses, moneda) },
+  ];
+  if (summary.cat != null) {
+    kpis.push({
+      icon: Landmark,
+      label: "CAT (Costo Anual Total)",
+      value: `${summary.cat.toFixed(2)}%`,
+      highlight: true,
+      ...(summary.costoTotal != null && {
+        hint: `Costo total: ${money(summary.costoTotal, moneda)}`,
+      }),
+    });
+  }
+  if (summary.tasaReal != null) {
+    kpis.push({
+      icon: TrendingDown,
+      label: "Tasa de interés real",
+      value: `${summary.tasaReal.toFixed(2)}%`,
+      hint: `Nominal ${summary.tasaAnual}% ajustada por inflación (Fisher)`,
+      highlight: true,
+    });
+  }
+  kpis.push({ icon: Cpu, label: "Compilación", value: `${summary.tiempoMs} ms` });
+  return kpis;
 }
 
 function EmptyState({ label }: { label: string }) {
@@ -98,22 +147,19 @@ export function ResultsPanel({ result }: { result: CompileResult | null }) {
           {result?.ok && result.summary ? (
             <ScrollArea className="h-full">
               <div className="space-y-4 p-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {[
-                    { icon: Wallet, label: "Cuota mensual", value: money(result.summary.cuota, moneda) },
-                    { icon: Percent, label: "Tasa mensual", value: `${result.summary.tasaMensual}%` },
-                    {
-                      icon: Hash,
-                      label: "Total intereses",
-                      value: money(result.summary.totalIntereses, moneda),
-                    },
-                    { icon: Cpu, label: "Compilación", value: `${result.summary.tiempoMs} ms` },
-                  ].map((kpi) => (
-                    <div key={kpi.label} className="panel p-3">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {buildKpis(result.summary).map((kpi) => (
+                    <div
+                      key={kpi.label}
+                      className={`panel p-3 ${kpi.highlight ? "border-primary/50 bg-primary/5" : ""}`}
+                    >
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <kpi.icon className="size-3.5" /> {kpi.label}
                       </div>
                       <p className="mt-1 font-mono text-lg text-foreground">{kpi.value}</p>
+                      {kpi.hint && (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">{kpi.hint}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -137,7 +183,11 @@ export function ResultsPanel({ result }: { result: CompileResult | null }) {
                         fontSize={11}
                         tickLine={false}
                       />
-                      <YAxis stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
+                      <YAxis
+                        stroke="var(--color-muted-foreground)"
+                        fontSize={11}
+                        tickLine={false}
+                      />
                       <ChartTooltip
                         contentStyle={{
                           background: "var(--color-popover)",
@@ -157,6 +207,18 @@ export function ResultsPanel({ result }: { result: CompileResult | null }) {
                 </div>
 
                 <div className="panel overflow-hidden">
+                  {(result.summary.graciaMeses ?? 0) > 0 && (
+                    <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
+                      <Badge
+                        variant="outline"
+                        className="border-warning/50 bg-warning/10 text-warning"
+                      >
+                        Gracia
+                      </Badge>
+                      Meses 1–{result.summary.graciaMeses}: solo se pagan intereses; el saldo no
+                      disminuye.
+                    </div>
+                  )}
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -170,9 +232,26 @@ export function ResultsPanel({ result }: { result: CompileResult | null }) {
                     </TableHeader>
                     <TableBody className="font-mono text-xs">
                       {result.amortization.map((row) => (
-                        <TableRow key={row.periodo}>
-                          <TableCell>{row.periodo}</TableCell>
-                          <TableCell className="text-right">{row.saldoInicial.toFixed(2)}</TableCell>
+                        <TableRow
+                          key={row.periodo}
+                          className={row.gracia ? "bg-warning/5 hover:bg-warning/10" : undefined}
+                        >
+                          <TableCell>
+                            <span className="inline-flex items-center gap-2">
+                              {row.periodo}
+                              {row.gracia && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-warning/50 bg-warning/10 px-1.5 py-0 text-[10px] text-warning"
+                                >
+                                  Gracia
+                                </Badge>
+                              )}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {row.saldoInicial.toFixed(2)}
+                          </TableCell>
                           <TableCell className="text-right text-primary">
                             {row.cuota.toFixed(2)}
                           </TableCell>

@@ -32,6 +32,22 @@ METODO: ALEMAN
 `,
   },
   {
+    id: "tasa-variable",
+    title: "Tasa variable con gracia",
+    description: "TIIE + spread, 3 meses de gracia, IVA, comisión e inflación",
+    code: `// Crédito PyME a tasa variable
+MONEDA: MXN
+CAPITAL: 100000
+TASA_BASE: "TIIE"
+SPREAD: 4.5%
+PLAZO: 12 MESES
+GRACIA_CAPITAL: 3 MESES
+COMISION: 1%
+IVA: 16%
+INFLACION_ESPERADA: 5.5%
+`,
+  },
+  {
     id: "error-semantico",
     title: "Error semántico",
     description: "Tasa negativa y mezcla de monedas",

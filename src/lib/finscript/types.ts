@@ -38,6 +38,8 @@ export interface AmortizationRow {
   interes: number;
   capital: number;
   saldoFinal: number;
+  /** Mes del periodo de gracia: solo se pagan intereses y el saldo no baja. */
+  gracia?: boolean;
 }
 
 export interface CompileSummary {
@@ -51,6 +53,17 @@ export interface CompileSummary {
   totalIntereses: number;
   totalPagado: number;
   tiempoMs: number;
+  graciaMeses?: number;
+  /** Comisión por apertura en dinero (COMISION % × capital). */
+  comision?: number;
+  /** IVA cobrado sobre los intereses, en dinero. */
+  ivaIntereses?: number;
+  /** Intereses + comisión + IVA sobre intereses, en dinero. */
+  costoTotal?: number;
+  /** Costo Anual Total en % anual (TIR de los flujos efectivos, anualizada). */
+  cat?: number;
+  /** Tasa real anual en % (ecuación de Fisher); null si no se declaró INFLACION_ESPERADA. */
+  tasaReal?: number | null;
 }
 
 export interface CompileResult {

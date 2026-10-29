@@ -245,7 +245,8 @@ function Playground() {
               <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
                 Claves soportadas:{" "}
                 <span className="font-mono text-code-keyword">
-                  MONEDA, CAPITAL, TASA_ANUAL, PLAZO, METODO, COMISION
+                  MONEDA, CAPITAL, TASA_ANUAL | TASA_BASE + SPREAD, PLAZO, METODO, COMISION, IVA,
+                  INFLACION_ESPERADA, GRACIA_CAPITAL
                 </span>
               </div>
             </div>
