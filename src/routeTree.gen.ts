@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ConfiguracionRouteImport } from './routes/configuracion'
 import { Route as ContratosRouteImport } from './routes/contratos'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConfiguracionRoute = ConfiguracionRouteImport.update({
+  id: '/configuracion',
+  path: '/configuracion',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContratosRoute = ContratosRouteImport.update({
   id: '/contratos',
   path: '/contratos',
@@ -32,30 +38,34 @@ const ContratosRoute = ContratosRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/configuracion': typeof ConfiguracionRoute
   '/contratos': typeof ContratosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/configuracion': typeof ConfiguracionRoute
   '/contratos': typeof ContratosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/configuracion': typeof ConfiguracionRoute
   '/contratos': typeof ContratosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/contratos'
+  fullPaths: '/' | '/auth' | '/configuracion' | '/contratos'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/contratos'
-  id: '__root__' | '/' | '/auth' | '/contratos'
+  to: '/' | '/auth' | '/configuracion' | '/contratos'
+  id: '__root__' | '/' | '/auth' | '/configuracion' | '/contratos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  ConfiguracionRoute: typeof ConfiguracionRoute
   ContratosRoute: typeof ContratosRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/configuracion': {
+      id: '/configuracion'
+      path: '/configuracion'
+      fullPath: '/configuracion'
+      preLoaderRoute: typeof ConfiguracionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contratos': {
       id: '/contratos'
       path: '/contratos'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  ConfiguracionRoute: ConfiguracionRoute,
   ContratosRoute: ContratosRoute,
 }
 export const routeTree = rootRouteImport

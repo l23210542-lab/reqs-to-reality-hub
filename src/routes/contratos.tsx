@@ -3,7 +3,18 @@ import { FileCode2, Loader2, Trash2, PenLine } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useSession } from "@/hooks/use-session";
+import { useSettings } from "@/hooks/use-settings";
 import { deleteContract, listContracts, type Contract } from "@/lib/contracts";
 import { toast } from "sonner";
 
@@ -51,6 +62,9 @@ function ContractsPage() {
   useEffect(() => {
     if (session) void refresh();
   }, [session]);
+
+  const [pendingDelete, setPendingDelete] = useState<Contract | null>(null);
+  const settings = useSettings();
 
   const remove = async (id: string) => {
     try {
@@ -110,7 +124,11 @@ function ContractsPage() {
                       size="sm"
                       variant="ghost"
                       className="gap-2 text-destructive"
-                      onClick={() => void remove(row.id)}
+                      aria-label={`Eliminar ${row.titulo}`}
+                      onClick={() => {
+                        if (settings.confirmDelete) setPendingDelete(row);
+                        else void remove(row.id);
+                      }}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -124,6 +142,30 @@ function ContractsPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este contrato?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borrará «{pendingDelete?.titulo}» de forma permanente. Esta acción no se puede
+              deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDelete) void remove(pendingDelete.id);
+                setPendingDelete(null);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }

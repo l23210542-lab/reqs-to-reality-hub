@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useSession } from "@/hooks/use-session";
+import { useSettings } from "@/hooks/use-settings";
+import { getSettings } from "@/lib/settings";
 import { compileSource } from "@/lib/finscript/api";
 import { DEFAULT_SOURCE, SAMPLES } from "@/lib/finscript/samples";
 import type { CompileResult } from "@/lib/finscript/types";
@@ -72,10 +74,17 @@ function Playground() {
   const [saved, setSaved] = useState<Contract[]>([]);
   const [saveOpen, setSaveOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const settings = useSettings();
 
   useEffect(() => {
     if (ready && !session) navigate({ to: "/auth" });
   }, [ready, session, navigate]);
+
+  useEffect(() => {
+    if (!contrato) setSourceCode(getSettings().plantilla);
+    // Solo al montar: la plantilla no debe pisar lo que el usuario ya escribió.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refreshSaved = async () => {
     try {
@@ -100,14 +109,16 @@ function Playground() {
         setContractId(row.id);
         setTitulo(row.titulo);
         setSourceCode(row.codigo_fuente);
+        if (getSettings().autoCompile) void handleCompile(row.codigo_fuente);
       })
       .catch((err: Error) => toast.error(`No se pudo abrir el contrato: ${err.message}`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contrato, session]);
 
-  const handleCompile = async () => {
+  const handleCompile = async (code: string = sourceCode) => {
     setIsCompiling(true);
     try {
-      const result = await compileSource(sourceCode);
+      const result = await compileSource(code, { tasasBase: getSettings().tasasBase });
       setCompiledResults(result);
       setErrors(result.errors);
       if (result.ok) toast.success(`Compilado en ${result.summary?.tiempoMs ?? 0} ms`);
@@ -149,6 +160,7 @@ function Playground() {
     setCompiledResults(null);
     setErrors([]);
     toast.success(`Cargado: ${row.titulo}`);
+    if (settings.autoCompile) void handleCompile(row.codigo_fuente);
   };
 
   return (
@@ -176,6 +188,7 @@ function Playground() {
                     setSourceCode(s.code);
                     setCompiledResults(null);
                     setErrors([]);
+                    if (settings.autoCompile) void handleCompile(s.code);
                   }}
                   className="flex flex-col items-start"
                 >
@@ -230,7 +243,13 @@ function Playground() {
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
                 <span className="font-mono text-xs text-muted-foreground">contrato.finscript</span>
-                <Button size="sm" onClick={handleCompile} disabled={isCompiling} className="gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => void handleCompile()}
+                  disabled={isCompiling}
+                  className="gap-2"
+                  title={settings.compileShortcut ? "Ctrl + Enter" : undefined}
+                >
                   {isCompiling ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
@@ -240,7 +259,18 @@ function Playground() {
                 </Button>
               </div>
               <div className="min-h-0 flex-1">
-                <CodeEditor value={sourceCode} onChange={setSourceCode} errors={errors} />
+                <CodeEditor
+                  value={sourceCode}
+                  onChange={setSourceCode}
+                  errors={errors}
+                  fontSize={settings.editorFontSize}
+                  wordWrap={settings.editorWordWrap}
+                  {...(settings.compileShortcut && {
+                    onSubmit: () => {
+                      if (!isCompiling) void handleCompile();
+                    },
+                  })}
+                />
               </div>
               <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
                 Claves soportadas:{" "}
@@ -253,7 +283,7 @@ function Playground() {
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={50} minSize={30}>
-            <ResultsPanel result={compiledResults} />
+            <ResultsPanel result={compiledResults} locale={settings.locale} />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

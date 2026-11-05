@@ -1,4 +1,4 @@
-import { compileLocally } from "./compiler";
+import { compileLocally, type CompileOptions } from "./compiler";
 import type { CompileError, CompileResult } from "./types";
 
 export function getBackendUrl(): string {
@@ -22,10 +22,14 @@ interface BackendPayload {
 /**
  * POST {VITE_API_URL}/compile hacia el backend FastAPI.
  * Sin VITE_API_URL se usa el compilador local equivalente.
+ * Las opciones solo aplican al compilador local; el backend usa su propia configuración.
  */
-export async function compileSource(sourceCode: string): Promise<CompileResult> {
+export async function compileSource(
+  sourceCode: string,
+  options: CompileOptions = {},
+): Promise<CompileResult> {
   const base = getBackendUrl();
-  if (!base) return compileLocally(sourceCode);
+  if (!base) return compileLocally(sourceCode, options);
 
   const started = performance.now();
   try {

@@ -32,8 +32,10 @@ import {
 } from "@/components/ui/table";
 import type { AstNode, CompileResult, CompileSummary } from "@/lib/finscript/types";
 
-const money = (n: number, moneda: string) =>
-  `${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${moneda}`;
+const num = (n: number, locale: string) =>
+  n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const money = (n: number, moneda: string, locale: string) => `${num(n, locale)} ${moneda}`;
 
 function AstTree({ node, depth = 0 }: { node: AstNode; depth?: number }) {
   return (
@@ -63,28 +65,32 @@ interface Kpi {
   highlight?: boolean;
 }
 
-function buildKpis(summary: CompileSummary): Kpi[] {
+function buildKpis(summary: CompileSummary, locale: string): Kpi[] {
   const { moneda } = summary;
   const kpis: Kpi[] = [
     {
       icon: Wallet,
       label: "Cuota mensual",
-      value: money(summary.cuota, moneda),
+      value: money(summary.cuota, moneda, locale),
       ...((summary.graciaMeses ?? 0) > 0 && {
         hint: `Tras ${summary.graciaMeses} mes(es) de gracia`,
       }),
     },
     { icon: Percent, label: "Tasa mensual", value: `${summary.tasaMensual}%` },
-    { icon: Hash, label: "Total intereses", value: money(summary.totalIntereses, moneda) },
+    {
+      icon: Hash,
+      label: "Total intereses",
+      value: money(summary.totalIntereses, moneda, locale),
+    },
   ];
   if (summary.cat != null) {
     kpis.push({
       icon: Landmark,
       label: "CAT (Costo Anual Total)",
-      value: `${summary.cat.toFixed(2)}%`,
+      value: `${num(summary.cat, locale)}%`,
       highlight: true,
       ...(summary.costoTotal != null && {
-        hint: `Costo total: ${money(summary.costoTotal, moneda)}`,
+        hint: `Costo total: ${money(summary.costoTotal, moneda, locale)}`,
       }),
     });
   }
@@ -92,7 +98,7 @@ function buildKpis(summary: CompileSummary): Kpi[] {
     kpis.push({
       icon: TrendingDown,
       label: "Tasa de interés real",
-      value: `${summary.tasaReal.toFixed(2)}%`,
+      value: `${num(summary.tasaReal, locale)}%`,
       hint: `Nominal ${summary.tasaAnual}% ajustada por inflación (Fisher)`,
       highlight: true,
     });
@@ -110,9 +116,13 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-export function ResultsPanel({ result }: { result: CompileResult | null }) {
-  const moneda = result?.summary?.moneda ?? "";
-
+export function ResultsPanel({
+  result,
+  locale = "es-MX",
+}: {
+  result: CompileResult | null;
+  locale?: string;
+}) {
   return (
     <Tabs defaultValue="tabla" className="flex h-full min-h-0 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
@@ -148,7 +158,7 @@ export function ResultsPanel({ result }: { result: CompileResult | null }) {
             <ScrollArea className="h-full">
               <div className="space-y-4 p-4">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {buildKpis(result.summary).map((kpi) => (
+                  {buildKpis(result.summary, locale).map((kpi) => (
                     <div
                       key={kpi.label}
                       className={`panel p-3 ${kpi.highlight ? "border-primary/50 bg-primary/5" : ""}`}
@@ -250,14 +260,16 @@ export function ResultsPanel({ result }: { result: CompileResult | null }) {
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            {row.saldoInicial.toFixed(2)}
+                            {num(row.saldoInicial, locale)}
                           </TableCell>
                           <TableCell className="text-right text-primary">
-                            {row.cuota.toFixed(2)}
+                            {num(row.cuota, locale)}
                           </TableCell>
-                          <TableCell className="text-right">{row.interes.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{row.capital.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{row.saldoFinal.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{num(row.interes, locale)}</TableCell>
+                          <TableCell className="text-right">{num(row.capital, locale)}</TableCell>
+                          <TableCell className="text-right">
+                            {num(row.saldoFinal, locale)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

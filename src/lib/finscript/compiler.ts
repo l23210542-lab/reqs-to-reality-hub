@@ -11,7 +11,12 @@ const MONEDAS = ["USD", "MXN", "EUR"];
 const METODOS = ["FRANCES", "ALEMAN"];
 
 /** Valores simulados (% anual) de las tasas de referencia; no hay fuente de mercado real. */
-const TASAS_BASE: Record<string, number> = { TIIE: 10.5, SOFR: 5.0 };
+export const DEFAULT_TASAS_BASE: Record<string, number> = { TIIE: 10.5, SOFR: 5.0 };
+
+export interface CompileOptions {
+  /** Tasas de referencia disponibles para TASA_BASE (% anual). */
+  tasasBase?: Record<string, number>;
+}
 
 const KEYWORDS = [
   "MONEDA",
@@ -28,6 +33,17 @@ const KEYWORDS = [
 ] as const;
 
 type Keyword = (typeof KEYWORDS)[number];
+
+/** Palabras que el lexer ya clasifica y no pueden usarse como nombre de tasa de referencia. */
+export function isReservedWord(word: string): boolean {
+  const w = word.toUpperCase();
+  return (
+    (KEYWORDS as readonly string[]).includes(w) ||
+    MONEDAS.includes(w) ||
+    METODOS.includes(w) ||
+    ["MESES", "MES", "ANIOS"].includes(w)
+  );
+}
 
 interface Statement {
   key: Keyword;
@@ -46,7 +62,10 @@ interface Token {
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /** Fase 1 — Analizador léxico: convierte el texto en tokens. */
-function lex(source: string): { tokens: Token[]; errors: CompileError[] } {
+function lex(
+  source: string,
+  tasasBase: Record<string, number>,
+): { tokens: Token[]; errors: CompileError[] } {
   const tokens: Token[] = [];
   const errors: CompileError[] = [];
 
@@ -70,7 +89,7 @@ function lex(source: string): { tokens: Token[]; errors: CompileError[] } {
       else if (["MESES", "MES", "ANIOS"].includes(value.toUpperCase())) type = "UNIDAD";
       else if (MONEDAS.includes(value.toUpperCase())) type = "MONEDA_LIT";
       else if (METODOS.includes(value.toUpperCase())) type = "METODO_LIT";
-      else if (Object.hasOwn(TASAS_BASE, value.toUpperCase())) type = "TASA_BASE_LIT";
+      else if (Object.hasOwn(tasasBase, value.toUpperCase())) type = "TASA_BASE_LIT";
       else if (!/^[A-Za-z_]/.test(value)) {
         type = "DESCONOCIDO";
         errors.push({
@@ -150,7 +169,10 @@ function parseMonths(raw: string): number | null {
 }
 
 /** Fase 3 — Análisis semántico: tabla de símbolos + reglas financieras. */
-function analyze(statements: Statement[]): {
+function analyze(
+  statements: Statement[],
+  tasasBase: Record<string, number>,
+): {
   symbols: Symbol[];
   errors: CompileError[];
   warnings: CompileError[];
@@ -413,10 +435,12 @@ function analyze(statements: Statement[]): {
           .replace(/^"(.*)"$/, "$1")
           .trim()
           .toUpperCase();
-        if (!Object.hasOwn(TASAS_BASE, v)) {
+        if (!Object.hasOwn(tasasBase, v)) {
           semanticError(
             st,
-            `Tasa base "${v}" no soportada. Use: ${Object.keys(TASAS_BASE).join(", ")}.`,
+            Object.keys(tasasBase).length
+              ? `Tasa base "${v}" no soportada. Use: ${Object.keys(tasasBase).join(", ")}.`
+              : `Tasa base "${v}" no soportada: no hay tasas de referencia configuradas.`,
           );
           break;
         }
@@ -465,7 +489,7 @@ function analyze(statements: Statement[]): {
       kind: "semantico",
     });
   } else if (usaBase && "TASA_BASE" in values && "SPREAD" in values) {
-    const base = TASAS_BASE[String(values["TASA_BASE"])]!;
+    const base = tasasBase[String(values["TASA_BASE"])]!;
     const tasa = Math.round((base + Number(values["SPREAD"])) * 10000) / 10000;
     const line = seen.get("SPREAD")!;
     if (tasa < 0) {
@@ -706,11 +730,12 @@ function computeCosts(
 }
 
 /** Orquesta las 4 fases del compilador (fallback local del backend FastAPI). */
-export function compileLocally(source: string): CompileResult {
+export function compileLocally(source: string, options: CompileOptions = {}): CompileResult {
+  const tasasBase = options.tasasBase ?? DEFAULT_TASAS_BASE;
   const start = performance.now();
   const logs: string[] = [];
 
-  const { tokens, errors: lexErrors } = lex(source);
+  const { tokens, errors: lexErrors } = lex(source, tasasBase);
   logs.push(`[lexer] ${tokens.length} tokens reconocidos, ${lexErrors.length} error(es).`);
 
   const { statements, errors: parseErrors } = parse(source);
@@ -736,7 +761,7 @@ export function compileLocally(source: string): CompileResult {
     };
   }
 
-  const { symbols, errors: semErrors, warnings, values } = analyze(statements);
+  const { symbols, errors: semErrors, warnings, values } = analyze(statements, tasasBase);
   logs.push(
     `[semantico] Tabla de símbolos con ${symbols.length} entrada(s), ${semErrors.length} error(es), ${warnings.length} advertencia(s).`,
   );

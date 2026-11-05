@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { FileCode2, FilePlus2, LogOut, Terminal } from "lucide-react";
+import { FileCode2, FilePlus2, LogOut, Settings, Terminal } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 const nav = [
   { to: "/", label: "Nuevo contrato", icon: FilePlus2 },
   { to: "/contratos", label: "Mis contratos", icon: FileCode2 },
+  { to: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
