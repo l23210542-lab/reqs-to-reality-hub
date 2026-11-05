@@ -119,7 +119,7 @@ reqs-to-reality-hub/
 └── backend/                  # ===== BACKEND =====
     ├── app/
     │   ├── __init__.py
-    │   └── main.py           # App FastAPI (CORS + /health)
+    │   └── main.py           # App FastAPI (CORS + /api/health)
     ├── requirements.txt
     └── supabase/
         ├── migrations/
@@ -177,9 +177,24 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Comprueba que responde en http://localhost:8000/health (`{"status":"ok"}`) y revisa la documentación interactiva en http://localhost:8000/docs.
+Comprueba que responde en http://localhost:8000/api/health (`{"status":"ok"}`) y revisa la documentación interactiva en http://localhost:8000/api/docs. Todas las rutas viven bajo `/api` porque así las enruta Vercel (ver [sección 4.5](#45-despliegue-en-vercel)).
 
-Para que el frontend use el backend, agrega `VITE_API_URL=http://localhost:8000` al `.env` y reinicia el dev server. **Hasta que exista `POST /compile` no lo hagas**: todas las compilaciones fallarían (ver [sección 10](#10-backend-fastapi)).
+Para que el frontend use el backend, agrega `VITE_API_URL=http://localhost:8000/api` al `.env` y reinicia el dev server. **Hasta que exista `POST /compile` no lo hagas**: todas las compilaciones fallarían (ver [sección 10](#10-backend-fastapi)).
+
+### 4.5 Despliegue en Vercel
+
+El repositorio se despliega como **un solo proyecto de Vercel con dos servicios** ([Vercel Services](https://vercel.com/docs/services)), definidos en `vercel.json`:
+
+| Servicio | Carpeta | Framework | Ruta pública |
+|---|---|---|---|
+| `app` | `.` (raíz) | TanStack Start (Lovable) | `/(.*)`: todo lo demás |
+| `backend` | `backend/` | FastAPI (`app.main:app`) | `/api/(.*)` |
+
+- Las reglas `rewrites` se evalúan en orden: primero `/api/*` hacia `backend` y al final el *catch-all* hacia `app`.
+- El servicio recibe la **ruta original** (Vercel no quita el prefijo), por eso FastAPI registra sus rutas bajo `/api`.
+- El frontend llama al backend **desde el navegador**, por la ruta pública `/api/*` del mismo dominio. No hay llamadas servidor a servidor, así que no se declaran *bindings*.
+- Variables en *Project Settings → Environment Variables*: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (necesarias en el **build**, porque Vite las incrusta en el bundle). `VITE_API_URL=/api` solo cuando el backend implemente `POST /api/compile`; mientras tanto, déjala vacía para usar el compilador local.
+- Para probar todo junto en local: `vercel dev` (o `vercel dev -L` sin iniciar sesión).
 
 ---
 
@@ -191,7 +206,7 @@ Se definen en `.env` (raíz). Solo las que empiezan con `VITE_` llegan al navega
 |---|---|---|---|
 | `VITE_SUPABASE_URL` | Sí | `https://abcd1234.supabase.co` | URL del proyecto de Supabase. La lee `src/lib/supabase.ts`. |
 | `VITE_SUPABASE_ANON_KEY` | Sí | `eyJhbGciOi…` | Clave pública *anon*. Es segura de exponer: la seguridad real la dan las políticas RLS. |
-| `VITE_API_URL` | No | `http://localhost:8000` | URL base del backend FastAPI. Vacía o ausente = compilador local en el navegador. Sin `/` final (se elimina si lo pones). |
+| `VITE_API_URL` | No | `http://localhost:8000/api` (local) · `/api` (Vercel) | URL base de la API del backend FastAPI. Vacía o ausente = compilador local en el navegador. Sin `/` final (se elimina si lo pones). |
 
 - Están tipadas en `src/vite-env.d.ts`. Si agregas una variable, **decláralá ahí también**; con `noPropertyAccessFromIndexSignature` activado, TypeScript da error si no está declarada.
 - Si falta `VITE_SUPABASE_URL` o `VITE_SUPABASE_ANON_KEY`, `src/lib/supabase.ts` lanza un error **al importar el módulo**, y la app entera no carga. Es intencional: falla rápido y con un mensaje claro.
@@ -581,7 +596,7 @@ Cada fase agrega una línea a `logs` (`[lexer]`, `[parser]`, `[semantico]`, `[co
 `backend/app/main.py` crea la app `FastAPI(title="FinScript Compiler API")` con:
 
 - **CORS** para cualquier puerto de `localhost` / `127.0.0.1` (`allow_origin_regex`). Si despliegas el frontend en otro dominio, agrégalo aquí.
-- `GET /health` → `{"status": "ok"}`.
+- `GET /api/health` → `{"status": "ok"}`. Todas las rutas se registran en un `APIRouter` con prefijo `/api` (constante `API_PREFIX`); Swagger queda en `/api/docs`.
 
 Dependencias (`requirements.txt`): `fastapi`, `uvicorn[standard]`, `pydantic>=2.7`, `lark>=1.2`.
 
@@ -793,11 +808,11 @@ Mensajes de commit sugeridos: `feat: …`, `fix: …`, `docs: …`, `refactor: �
 4. Captura `lark.exceptions.UnexpectedInput` (y similares) y devuelve `400` con `errors: [{line, column, message, kind}]`. Agrega un *exception handler* global que devuelva JSON también en errores 500.
 5. Prueba con `curl`:
    ```bash
-   curl -X POST http://localhost:8000/compile -H "Content-Type: application/json" \
+   curl -X POST http://localhost:8000/api/compile -H "Content-Type: application/json" \
         -d "{\"source_code\": \"MONEDA: USD\nCAPITAL: 10000\nTASA_ANUAL: 12.5%\nPLAZO: 6 MESES\"}"
    ```
 6. Compara contra `compileLocally` con la misma entrada.
-7. Pon `VITE_API_URL=http://localhost:8000` en `.env`, reinicia el frontend y verifica que la insignia diga "backend".
+7. Pon `VITE_API_URL=http://localhost:8000/api` en `.env`, reinicia el frontend y verifica que la insignia diga "backend". El endpoint debe registrarse en el `router` con prefijo `/api` de `main.py`.
 
 ### 15.6 Agregar un componente de shadcn/ui
 
@@ -818,7 +833,7 @@ Se crea en `src/components/ui/`. Úsalo con `import { X } from "@/components/ui/
 | "new row violates row-level security policy" | Insert sin sesión válida o con un `user_id` ajeno. | Verifica la sesión; no envíes `user_id`. |
 | El login dice "Email not confirmed" | La confirmación de correo está activa en Supabase. | Confirma el correo o desactívala en *Auth → Providers → Email* (solo en desarrollo). |
 | Te redirige a `/auth` aunque iniciaste sesión | Se redirige antes de `ready`, o la sesión expiró. | Usa siempre `ready && !session`. |
-| "No se pudo contactar el backend en …" | `VITE_API_URL` definida pero FastAPI caído, URL incorrecta, CORS, o respuesta no JSON. | Revisa `/health`, la consola del navegador (pestaña *Network*) y los logs de uvicorn. Para volver al compilador local, deja `VITE_API_URL` vacía. |
+| "No se pudo contactar el backend en …" | `VITE_API_URL` definida pero FastAPI caído, URL incorrecta, CORS, o respuesta no JSON. | Revisa `/api/health`, la consola del navegador (pestaña *Network*) y los logs de uvicorn. Para volver al compilador local, deja `VITE_API_URL` vacía. |
 | Error CORS en el navegador | El origen del frontend no coincide con `allow_origin_regex`. | Agrega el origen en `backend/app/main.py`. |
 | `routeTree.gen.ts` con conflictos o desactualizado | Archivo generado. | Bórralo y ejecuta `npm run dev`. |
 | Error de TS "comes from an index signature" | Variable de entorno no declarada. | Declárala en `src/vite-env.d.ts`. |
@@ -830,7 +845,7 @@ Herramientas útiles:
 - **DevTools → Network**: peticiones a `*.supabase.co/rest/v1/contratos` y a `/compile`.
 - **DevTools → Application → Local Storage**: clave `sb-<ref>-auth-token` con la sesión de Supabase.
 - **Supabase Dashboard**: *Table editor*, *Auth → Users* y *Logs* (API y Postgres).
-- **FastAPI** `/docs`: Swagger para probar endpoints.
+- **FastAPI** `/api/docs`: Swagger para probar endpoints.
 
 ---
 
